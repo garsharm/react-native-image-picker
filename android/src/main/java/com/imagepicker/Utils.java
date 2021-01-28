@@ -14,6 +14,7 @@ import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.util.Base64;
+import android.util.Log;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.FileProvider;
@@ -32,6 +33,7 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.UUID;
 
+import static android.content.ContentValues.TAG;
 import static com.imagepicker.ImagePickerModule.*;
 
 public class Utils {
@@ -73,7 +75,7 @@ public class Utils {
         }
     }
 
-    public static void saveToPublicDirectory(Uri uri, Context context, String mediaType) {
+    public static Uri saveToPublicDirectory(Uri uri, Context context, String mediaType) {
         ContentResolver resolver = context.getContentResolver();
         Uri mediaStoreUri;
         ContentValues fileDetails = new ContentValues();
@@ -85,8 +87,9 @@ public class Utils {
             fileDetails.put(MediaStore.Images.Media.DISPLAY_NAME, UUID.randomUUID().toString());
             mediaStoreUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, fileDetails);
         }
-
         copyUri(uri, mediaStoreUri, resolver);
+        deleteFile(uri, context);
+        return mediaStoreUri;
     }
 
     public static void copyUri(Uri fromUri, Uri toUri, ContentResolver resolver) {
@@ -172,7 +175,6 @@ public class Utils {
             Bitmap b = BitmapFactory.decodeStream(imageStream);
             b = Bitmap.createScaledBitmap(b, newDimens[0], newDimens[1], true);
             String originalOrientation = getOrientation(uri, context);
-
             File file = createFile(context, getFileTypeFromMime(mimeType));
             OutputStream os = context.getContentResolver().openOutputStream(Uri.fromFile(file));
             b.compress(getBitmapCompressFormat(mimeType), options.quality, os);
@@ -301,6 +303,16 @@ public class Utils {
             return true;
         }
     }
+    static String getRealPathFromCursor(Cursor cursor) {
+        try {
+            int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+            return cursor.getString(column_index);
+        } catch (Exception e) {
+            Log.e(TAG, "getRealPathFromURI Exception : " + e.toString());
+            return "";
+        }
+    }
+
 
     static ReadableMap getResponseMap(Uri uri, Options options, Context context) {
         ContentResolver resolver = context.getContentResolver();
@@ -308,12 +320,13 @@ public class Utils {
         Cursor returnCursor = resolver.query(uri, null, null, null, null);
         int nameIndex = returnCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
         returnCursor.moveToFirst();
-
+        String path = getRealPathFromCursor(returnCursor);
         String fileName = returnCursor.getString(nameIndex);
         int[] dimensions = getImageDimensions(uri, context);
 
         WritableMap map = Arguments.createMap();
         map.putString("uri", uri.toString());
+        map.putString("path", path);
         map.putDouble("fileSize", getFileSize(uri, context));
         map.putString("fileName", fileName);
         map.putString("type", resolver.getType(uri));

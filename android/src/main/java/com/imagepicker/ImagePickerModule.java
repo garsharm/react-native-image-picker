@@ -127,8 +127,7 @@ public class ImagePickerModule extends ReactContextBaseJavaModule implements Act
             callback.invoke(getErrorMap(errOthers, "Uri error"));
             return;
         }
-        Uri newUri = resizeImage(uri, reactContext, options);
-        callback.invoke(getResponseMap(newUri, options, reactContext));
+        callback.invoke(getResponseMap(uri, options, reactContext));
     }
 
     void onVideoObtained(Uri uri) {
@@ -153,7 +152,14 @@ public class ImagePickerModule extends ReactContextBaseJavaModule implements Act
         switch (requestCode) {
             case REQUEST_LAUNCH_IMAGE_CAPTURE:
                 if (options.saveToPhotos) {
-                    saveToPublicDirectory(cameraCaptureURI, reactContext, "photo");
+                    cameraCaptureURI = saveToPublicDirectory(cameraCaptureURI, reactContext, "photo");
+                }
+                Uri newUri = resizeImage(cameraCaptureURI, reactContext, options);
+                if (newUri != cameraCaptureURI) {
+                    newUri = saveToPublicDirectory(newUri, reactContext, "photo");
+                    // TODO: Add option to delete original copy; default delete: true
+                    deleteFile(cameraCaptureURI, reactContext);
+                    cameraCaptureURI = newUri;
                 }
                 onImageObtained(cameraCaptureURI);
                 break;
@@ -168,7 +174,7 @@ public class ImagePickerModule extends ReactContextBaseJavaModule implements Act
 
             case REQUEST_LAUNCH_VIDEO_CAPTURE:
                 if (options.saveToPhotos) {
-                    saveToPublicDirectory(cameraCaptureURI, reactContext, "video");
+                    cameraCaptureURI = saveToPublicDirectory(cameraCaptureURI, reactContext, "video");
                 }
                 onVideoObtained(cameraCaptureURI);
                 break;
